@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Deadlock — Player Performance</title>
+<style>
+:root{
+ --site-primary:#8b5cf6;--site-on-primary:#ffffff;
+ --site-secondary:#172033;--site-on-secondary:#e8edf8;
+ --site-background:#0b0e16;--site-on-background:#edf1fb;
+ --site-font-body:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+ --site-font-heading:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+ --site-heading-scale:1;--site-spacing-scale:1;--site-radius-scale:1;--site-decoration-opacity:1;
+ --surface:#121826;--surface2:#171f30;--muted:#8e9bb3;--line:#293449;--green:#50e3a4;--red:#ff6b83;--blue:#6da8ff;
+}
+*{box-sizing:border-box}
+body{margin:0;background:light-dark(#f3f5fa,var(--site-background));color:light-dark(#101522,var(--site-on-background));font-family:var(--site-font-body)}
+.app{background:light-dark(#f3f5fa,var(--site-background));color:light-dark(#101522,var(--site-on-background));min-height:100vh;padding:28px clamp(16px,4vw,56px);border-radius:0}
+header{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:28px}
+.brand{display:flex;align-items:center;gap:13px}
+.logo{width:42px;height:42px;border-radius:12px;background:var(--site-primary);display:grid;place-items:center;color:white;font-weight:900;font-size:21px;box-shadow:0 8px 28px #8b5cf633}
+h1,h2,h3,p{margin:0}
+h1{font-size:calc(26px * var(--site-heading-scale));letter-spacing:-.8px}
+.sub{color:var(--muted);font-size:13px;margin-top:4px}
+.header-actions{display:flex;gap:10px;align-items:center}
+button,.input{border:1px solid var(--line);background:var(--surface);color:var(--site-on-background);padding:10px 14px;border-radius:calc(10px * var(--site-radius-scale));font:inherit}
+button{cursor:pointer}button:hover{border-color:var(--site-primary)}
+button.primary{background:var(--site-primary);color:white;border-color:transparent;font-weight:700}
+.status{font-size:12px;color:var(--green);display:flex;align-items:center;gap:7px}
+.status:before{content:"";width:7px;height:7px;background:currentColor;border-radius:50%}
+.profile{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;background:linear-gradient(115deg,#171e2e,#111724 70%,#211b38);border:1px solid #30354a;border-radius:calc(18px * var(--site-radius-scale));padding:24px;margin-bottom:20px;color:#f1f5ff}
+.player{display:flex;align-items:center;gap:16px}
+.avatar{width:64px;height:64px;border-radius:16px;background:linear-gradient(135deg,#8b5cf6,#38bdf8);display:grid;place-items:center;font-size:27px;font-weight:900}
+.profile h2{font-size:22px}.profile .sub{color:#9aa8c3}
+.rank{text-align:right}.rank small{color:#9aa8c3;display:block;font-size:11px;text-transform:uppercase;letter-spacing:1.4px}.rank strong{font-size:25px;display:block;margin:4px 0}.rank span{font-size:12px;color:#a78bfa}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
+.card{background:light-dark(#fff,var(--surface));border:1px solid light-dark(#e1e6ef,var(--line));border-radius:calc(15px * var(--site-radius-scale));padding:18px;min-width:0}
+.metric-top{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12px}
+.metric-icon{width:30px;height:30px;border-radius:9px;background:#8b5cf61a;color:#a78bfa;display:grid;place-items:center;font-weight:800}
+.metric-value{font-size:30px;font-weight:800;letter-spacing:-1px;margin:12px 0 5px}
+.metric-foot{font-size:12px;color:var(--muted)}.positive{color:var(--green)}.negative{color:var(--red)}
+.main-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,1fr);gap:16px;margin-bottom:16px}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.card-head h3{font-size:15px}.card-head p{font-size:11px;color:var(--muted);margin-top:4px}
+.pills{display:flex;gap:5px;background:light-dark(#f0f2f8,#0c111b);padding:4px;border-radius:9px}
+.pills button{padding:6px 10px;border:0;background:transparent;color:var(--muted);font-size:11px}
+.pills button.active{background:var(--site-primary);color:white}
+.chart{height:220px;position:relative;width:100%}.chart svg{width:100%;height:100%;overflow:visible}
+.legend{display:flex;gap:14px;color:var(--muted);font-size:11px;margin-top:8px}
+.legend span:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--site-primary);margin-right:6px}
+.legend .blue:before{background:var(--blue)}
+.hero-list{display:flex;flex-direction:column;gap:15px}
+.hero-row{display:grid;grid-template-columns:36px 1fr auto;gap:10px;align-items:center}
+.hero-avatar{width:36px;height:36px;border-radius:9px;background:#2a3347;display:grid;place-items:center;font-size:15px}
+.hero-name{font-size:12px;font-weight:700}.hero-meta{font-size:10px;color:var(--muted);margin-top:3px}
+.hero-stat{text-align:right;font-size:12px;font-weight:700}.hero-stat small{display:block;font-size:10px;color:var(--muted);font-weight:400;margin-top:3px}
+.bar{height:4px;background:#283247;border-radius:4px;margin-top:8px;overflow:hidden}.bar i{display:block;height:100%;background:var(--site-primary);border-radius:4px}
+.rank-chart{height:160px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;color:var(--muted);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:.7px;padding:0 10px 12px}
+td{padding:12px 10px;border-top:1px solid var(--line)}
+.result{font-weight:800}.win{color:var(--green)}.loss{color:var(--red)}
+.hero-cell{display:flex;align-items:center;gap:8px;font-weight:700}
+.match-mode{color:var(--muted);font-size:10px;margin-top:3px}
+.kda{font-variant-numeric:tabular-nums}
+.footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:11px;padding:15px 2px}
+.notice{background:#1e1a2c;border:1px solid #4d3974;color:#c9b7f8;border-radius:10px;padding:12px 14px;font-size:12px;line-height:1.5;margin-bottom:16px}
+input{width:190px;max-width:100%;background:var(--surface);color:var(--site-on-background);border:1px solid var(--line);padding:10px;border-radius:9px}
+@media(max-width:950px){.grid{grid-template-columns:repeat(2,1fr)}.main-grid{grid-template-columns:1fr}}
+@media(max-width:560px){.grid{grid-template-columns:1fr 1fr}.metric-value{font-size:24px}.profile{padding:17px}.rank{text-align:left}.header-actions{width:100%;flex-wrap:wrap}.header-actions input{flex:1}.app{padding:18px 12px}td,th{padding-left:5px;padding-right:5px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+ <div class="brand"><div class="logo">D</div><div><h1>DEADLOCK <span style="color:var(--site-primary)">TRACKER</span></h1><p class="sub">PLAYER PERFORMANCE CENTER</p></div></div>
+ <div class="header-actions"><div class="status" id="connectionStatus">API not connected</div><input id="playerId" value="1164063101" placeholder="Steam ID / account ID" aria-label="Steam account ID"><button class="primary" id="loadBtn">Load profile</button></div>
+</header>
+<div class="notice" id="notice"><b>Live API connection:</b> This dashboard connects directly to the public Deadlock API at deadlock-api.com. Your Steam profile ID has been converted to SteamID3/account ID and pre-filled. If your profile is private or the API does not expose a requested statistic, the page will show an error or unavailable field rather than inventing data.</div>
+<section class="profile">
+ <div class="player"><div class="avatar">D</div><div><h2 id="playerName">Deadlock Player</h2><p class="sub" id="playerSub">Steam profile · waiting for account ID</p><p style="margin-top:8px;font-size:11px;color:#aab5ca">Competitive queue · Season overview</p></div></div>
+ <div class="rank"><small>Current rank</small><strong id="rankName">—</strong><span id="rankNote">Waiting for API data</span></div>
+</section>
+<section class="grid">
+ <div class="card"><div class="metric-top">WIN RATE <span class="metric-icon">%</span></div><div class="metric-value" id="winrate">—</div><div class="metric-foot" id="winrateNote">Calculated from fetched matches</div></div>
+ <div class="card"><div class="metric-top">MATCHES PLAYED <span class="metric-icon">▤</span></div><div class="metric-value" id="matches">—</div><div class="metric-foot">Fetched match history</div></div>
+ <div class="card"><div class="metric-top">K / D / A <span class="metric-icon">✦</span></div><div class="metric-value" id="kda">—</div><div class="metric-foot">Average per match</div></div>
+ <div class="card"><div class="metric-top">WIN STREAK <span class="metric-icon">↗</span></div><div class="metric-value" id="streak">—</div><div class="metric-foot">From fetched match history</div></div>
+</section>
+<section class="main-grid">
+ <div class="card">
+  <div class="card-head"><div><h3>Performance history</h3><p>Recent match win/loss trend</p></div><div class="pills"><button class="active" data-period="30">30</button><button data-period="90">90</button><button data-period="all">ALL</button></div></div>
+  <div class="chart"><svg id="performanceChart" viewBox="0 0 600 220" preserveAspectRatio="none" aria-label="Win rate graph"></svg></div>
+  <div class="legend"><span>Win rate</span><span class="blue">Match trend</span></div>
+ </div>
+ <div class="card">
+  <div class="card-head"><div><h3>Hero statistics</h3><p>Most played heroes</p></div><button id="heroSort">Sort: Win rate</button></div>
+  <div class="hero-list" id="heroList"></div>
+ </div>
+</section>
+<section class="main-grid">
+ <div class="card">
+  <div class="card-head"><div><h3>Rank progression</h3><p>Rank snapshots saved by this browser</p></div><span class="positive" style="font-size:12px" id="rankDelta">No history yet</span></div>
+  <div class="chart rank-chart"><svg id="rankChart" viewBox="0 0 600 160" preserveAspectRatio="none" aria-label="Rank progression graph"></svg></div>
+  <div class="legend"><span>Rank points</span></div>
+ </div>
+ <div class="card">
+  <div class="card-head"><div><h3>Recent form</h3><p>Latest fetched matches</p></div><span style="font-size:12px;color:var(--muted)" id="recentRecord">—</span></div>
+  <div id="formDots" style="display:flex;gap:7px;flex-wrap:wrap;margin:18px 0"></div>
+  <p style="font-size:12px;color:var(--muted);line-height:1.7">Your recent match outcomes at a glance. Hover or tap a match for its result.</p>
+</div>
+</section>
+<section class="card">
+ <div class="card-head"><div><h3>Match history</h3><p>Latest competitive games</p></div><button id="showAll">Show all matches ↓</button></div>
+ <div style="overflow-x:auto"><table><thead><tr><th>Result</th><th>Hero</th><th>K / D / A</th><th>Duration</th><th>Mode</th><th>Time</th></tr></thead><tbody id="matchesTable"></tbody></table></div>
+</section>
+<div class="footer"><span>DEADLOCK TRACKER · Personal stats dashboard</span><span>Data source: Deadlock API · deadlock-api.com</span></div>
+</div>
+<script>
+const sample={
+ heroes:[
+  {name:"Dynamo",icon:"✺",games:42,win:64,kda:"7.8 / 4.2 / 12.4"},
+  {name:"Haze",icon:"◈",games:36,win:61,kda:"11.2 / 5.1 / 6.3"},
+  {name:"Seven",icon:"ϟ",games:29,win:58,kda:"9.4 / 4.8 / 8.1"},
+  {name:"Lady Geist",icon:"♧",games:24,win:54,kda:"8.6 / 5.6 / 7.2"},
+  {name:"Wraith",icon:"◇",games:18,win:50,kda:"10.1 / 4.9 / 5.8"}
+ ],
+ matches:[
+  ["W","Dynamo","8 / 3 / 14","32:14","Ranked","12 min ago"],
+  ["W","Haze","13 / 5 / 7","28:51","Ranked","1 hour ago"],
+  ["L","Seven","6 / 8 / 11","35:02","Ranked","3 hours ago"],
+  ["W","Dynamo","9 / 4 / 16","31:45","Ranked","Yesterday"],
+  ["W","Lady Geist","10 / 6 / 8","29:20","Ranked","Yesterday"],
+  ["L","Wraith","7 / 9 / 5","33:18","Ranked","Yesterday"],
+  ["W","Haze","15 / 3 / 6","26:41","Ranked","2 days ago"],
+  ["W","Dynamo","5 / 2 / 18","30:06","Ranked","2 days ago"],
+  ["L","Seven","8 / 10 / 9","38:15","Ranked","3 days ago"],
+  ["W","Haze","12 / 4 / 8","27:33","Ranked","3 days ago"]
+ ],
+ winrate:[48,52,46,55,51,59,57,62,54,58,64,60,55,67,61,58,63,56,60,66,58,62,57,64,60,68,59,63,61,58],
+ rank:[22,24,23,28,30,29,34,33,37,39,38,43,45,44,48,51,50,54,57,56,61,63,62,67,70,68,73,76,78,82]
+};
+let period=30,allMatches=false,sortWin=true,liveMatches=[],liveHeroes=[],rankHistory=[];
+const API="https://api.deadlock-api.com/v1";
+const $=id=>document.getElementById(id);
+function setStatus(message,ok=false){$('connectionStatus').textContent=message;$('connectionStatus').style.color=ok?'var(--green)':'var(--muted)';}
+function fmtDuration(seconds){if(!Number.isFinite(seconds))return '—';return `${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;}
+function num(v){const n=Number(v);return Number.isFinite(n)?n:0;}
+function first(obj,keys){for(const k of keys)if(obj?.[k]!=null)return obj[k];return null;}
+function normalizeMatch(m){const stats=m.player_stats||m.stats||m;const kills=num(first(stats,['kills','kill'])),deaths=num(first(stats,['deaths','death'])),assists=num(first(stats,['assists','assist']));
+ const won=first(m,['won','win','is_win']);const team=first(m,['player_team','team']);const winningTeam=first(m,['winning_team','winner_team']);
+ let result=typeof won==='boolean'?won:(winningTeam!=null&&team!=null?String(winningTeam)===String(team):null);
+ return {id:first(m,['match_id','matchId','id']),hero:first(m,['hero_name','hero','hero_id'])??'Unknown hero',kills,deaths,assists,duration:fmtDuration(num(first(m,['match_duration_s','duration_s','duration']))),time:first(m,['start_time','start_time_s','timestamp'])??null,result};}
+function matchDate(v){if(v==null)return '—';let d=typeof v==='number'?new Date(v<1e12?v*1000:v):new Date(v);return Number.isNaN(d.getTime())?'—':d.toLocaleDateString();}
+async function getJson(url){const res=await fetch(url,{headers:{Accept:'application/json'}});if(!res.ok)throw new Error(`API returned HTTP ${res.status} for ${new URL(url).pathname}`);return res.json();}
+async function loadProfile(){const raw=$('playerId').value.trim();if(!raw){$('notice').innerHTML='<b>Enter your SteamID3/account ID.</b> You can find it in your Steam profile URL or use a Steam ID converter.';return;}
+ const id=raw.replace(/^\s+|\s+$/g,'');if(!/^\d+$/.test(id)){ $('notice').textContent='Please enter a numeric Steam account ID (SteamID3/account ID), not a display name or vanity URL.';return;}
+ setStatus('Connecting…');$('loadBtn').disabled=true;$('notice').textContent='Fetching public match history and player summary…';
+ try{
+  const history=await getJson(`${API}/players/${encodeURIComponent(id)}/match-history?limit=100`);
+  const matches=Array.isArray(history)?history:(history.matches||history.data||[]);
+  if(!Array.isArray(matches)||!matches.length)throw new Error('No public match history was returned. Check the ID and whether your stats are public.');
+  liveMatches=matches.map(normalizeMatch);liveMatches.sort((a,b)=>num(b.time)-num(a.time));
+  const name=`Steam ${id}`;
+  $('playerName').textContent=name;$('playerSub').textContent=`Steam account ${id} · Deadlock API`;
+  const known=liveMatches.filter(m=>m.result!==null);const wins=known.filter(m=>m.result).length;const losses=known.length-wins;
+  $('winrate').textContent=known.length?`${(wins/known.length*100).toFixed(1)}%`:'N/A';$('matches').textContent=liveMatches.length;
+  const totalK=liveMatches.reduce((s,m)=>s+m.kills,0),totalD=liveMatches.reduce((s,m)=>s+m.deaths,0),totalA=liveMatches.reduce((s,m)=>s+m.assists,0),count=liveMatches.length||1;
+  $('kda').textContent=`${(totalK/count).toFixed(1)} / ${(totalD/count).toFixed(1)} / ${(totalA/count).toFixed(1)}`;
+  let streak=0;for(const m of liveMatches){if(m.result===true)streak++;else break;}
+  $('streak').textContent=streak?`${streak} W`:'—';$('winrateNote').textContent=`${wins} wins · ${losses} losses · ${known.length} matches with result data`;
+  const rank=null;$('rankName').textContent='Not available';$('rankNote').textContent='Rank is not returned by match history';
+  renderLive();setStatus('API connected',true);$('notice').innerHTML=`<b>Connected:</b> Live match history loaded for ${name}. Stats reflect the most recent ${liveMatches.length} matches returned by the API. Some fields may be unavailable depending on API response/privacy settings.`;
+  // Rank history is unavailable from the match-history response.
+ }catch(err){setStatus('Connection failed');$('notice').innerHTML=`<b>Could not load live stats:</b> ${String(err.message||err)}. Verify the numeric Steam account ID and check that your Deadlock profile is public. The API may also change endpoint schemas or limit requests.`;console.error(err);}
+ finally{$('loadBtn').disabled=false;}}
+function renderLive(){
+ const known=liveMatches.filter(m=>m.result!==null);const wins=known.filter(m=>m.result).length;const recent=known.slice(0,10);$('recentRecord').textContent=`${recent.filter(m=>m.result).length}W · ${recent.filter(m=>!m.result).length}L`;
+ $('formDots').innerHTML=liveMatches.slice(0,10).map((m,i)=>`<button title="Match ${i+1}: ${m.result===null?'Result unavailable':m.result?'Victory':'Defeat'}" style="width:34px;height:34px;padding:0;background:${m.result===true?'#123b32':m.result===false?'#401e2a':'#252d3b'};color:${m.result===true?'#50e3a4':m.result===false?'#ff6b83':'#9aa8c3'};font-weight:800">${m.result===true?'W':m.result===false?'L':'?'}</button>`).join('');
+ $('matchesTable').innerHTML=(allMatches?liveMatches:liveMatches.slice(0,5)).map(m=>`<tr><td class="result ${m.result===true?'win':m.result===false?'loss':''}">${m.result===true?'VICTORY':m.result===false?'DEFEAT':'UNKNOWN'}</td><td><div class="hero-cell">${m.hero}</div></td><td class="kda">${m.kills} / ${m.deaths} / ${m.assists}</td><td>${m.duration}</td><td>Match</td><td>${matchDate(m.time)}</td></tr>`).join('');
+ const byHero={};for(const m of liveMatches){const h=String(m.hero);if(!byHero[h])byHero[h]={name:h,icon:'✦',games:0,wins:0,k:0,d:0,a:0};const x=byHero[h];x.games++;if(m.result===true)x.wins++;x.k+=m.kills;x.d+=m.deaths;x.a+=m.assists;}
+ liveHeroes=Object.values(byHero).map(h=>({...h,win:h.games?h.wins/h.games*100:0,kda:`${(h.k/h.games).toFixed(1)} / ${(h.d/h.games).toFixed(1)} / ${(h.a/h.games).toFixed(1)}`}));renderHeroes();
+ const winSeries=liveMatches.slice(0,period).reverse().map((m,i,arr)=>{const from=Math.max(0,i-4),chunk=arr.slice(from,i+1).filter(x=>x.result!==null);return chunk.length?chunk.filter(x=>x.result).length/chunk.length*100:0;});
+ svgLine('performanceChart',winSeries.length>1?winSeries:[0,0],'#a78bfa');
+ const saved=(()=>{try{return JSON.parse(localStorage.getItem('deadlock-rank-history')||'[]')}catch(e){return []}})();rankHistory=saved;
+ if(rankHistory.length>1){svgLine('rankChart',rankHistory.map(x=>x.rank),'#6da8ff');$('rankDelta').textContent='Saved snapshots';}else{$('rankChart').innerHTML='<text x="300" y="80" text-anchor="middle" fill="currentColor" opacity=".6" font-size="13">Rank history accumulates after repeated visits</text>';}
+}
+function svgLine(id,values,color,fill=true){
+ const svg=document.getElementById(id),w=600,h=id==="rankChart"?160:220,p=24;
+ const min=Math.min(...values)-5,max=Math.max(...values)+5;
+ const pts=values.map((v,i)=>`${p+i*(w-2*p)/(values.length-1)},${h-p-(v-min)/(max-min)*(h-2*p)}`).join(" ");
+ let grid="";
+ for(let i=0;i<4;i++){let y=p+i*(h-2*p)/3;grid+=`<line x1="${p}" y1="${y}" x2="${w-p}" y2="${y}" stroke="currentColor" opacity=".09"/>`}
+ svg.innerHTML=grid+(fill?`<polygon points="${p},${h-p} ${pts} ${w-p},${h-p}" fill="${color}" opacity=".10"/>`:"")+`<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`+values.map((v,i)=>{if(i%Math.ceil(values.length/8))return "";let x=p+i*(w-2*p)/(values.length-1),y=h-p-(v-min)/(max-min)*(h-2*p);return `<circle cx="${x}" cy="${y}" r="3.5" fill="${color}"/>`}).join("");
+}
+function renderHeroes(){
+ let heroes=[...(liveHeroes.length?liveHeroes:sample.heroes)].sort((a,b)=>sortWin?b.win-a.win:b.games-a.games);
+ document.getElementById("heroList").innerHTML=heroes.map(h=>`<div><div class="hero-row"><div class="hero-avatar">${h.icon}</div><div><div class="hero-name">${h.name}</div><div class="hero-meta">${h.games} matches · ${h.kda} K/D/A</div></div><div class="hero-stat">${h.win}%<small>win rate</small></div></div><div class="bar"><i style="width:${h.win}%"></i></div></div>`).join("");
+}
+function renderMatches(){
+ if(liveMatches.length){renderLive();return;}
+ let data=allMatches?sample.matches:sample.matches.slice(0,5);
+ document.getElementById("matchesTable").innerHTML=data.map(m=>`<tr><td class="result ${m[0]==="W"?"win":"loss"}">${m[0]==="W"?"VICTORY":"DEFEAT"}</td><td><div class="hero-cell"><span class="hero-avatar" style="width:25px;height:25px;font-size:11px">${(sample.heroes.find(h=>h.name===m[1])||{icon:"✦"}).icon}</span>${m[1]}</div></td><td class="kda">${m[2]}</td><td>${m[3]}</td><td>${m[4]}</td><td>${m[5]}</td></tr>`).join("");
+}
+function renderForm(){
+ const outcomes=["W","W","L","W","W","L","W","W","L","W"];
+ document.getElementById("formDots").innerHTML=outcomes.map((o,i)=>`<button title="Match ${10-i}: ${o==="W"?"Victory":"Defeat"}" style="width:34px;height:34px;padding:0;background:${o==="W"?"#123b32":"#401e2a"};border-color:${o==="W"?"#23664f":"#733044"};color:${o==="W"?"#50e3a4":"#ff6b83"};font-weight:800">${o}</button>`).join("");
+}
+function render(){let vals=sample.winrate.slice(-period);svgLine("performanceChart",vals,"#a78bfa");svgLine("rankChart",sample.rank,"#6da8ff");renderHeroes();renderMatches();renderForm();}
+document.querySelectorAll("[data-period]").forEach(b=>b.addEventListener("click",()=>{period=b.dataset.period==="all"?100:Number(b.dataset.period);document.querySelectorAll("[data-period]").forEach(x=>x.classList.toggle("active",x===b));liveMatches.length?renderLive():render()}));
+document.getElementById("heroSort").onclick=()=>{sortWin=!sortWin;document.getElementById("heroSort").textContent=sortWin?"Sort: Win rate":"Sort: Matches";renderHeroes()};
+document.getElementById("showAll").onclick=()=>{allMatches=!allMatches;document.getElementById("showAll").textContent=allMatches?"Show fewer matches ↑":"Show all matches ↓";renderMatches()};
+document.getElementById("loadBtn").onclick=loadProfile;
+document.getElementById("playerId").addEventListener("keydown",e=>{if(e.key==='Enter')loadProfile()});
+render();
+</script>
+</body>
+</html>
