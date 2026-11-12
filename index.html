@@ -17,6 +17,7 @@
 <!-- The app wrapper groups the dashboard and provides its overall page spacing. -->
 <div class="app">
 <!-- HEADER: the title, connection status, account ID field, and button for loading live data. -->
+<!-- The header is the top control area. The input lets you enter a player account number, and the button starts loading that player. -->
 <header>
  <div class="brand"><div class="logo">D</div><div><h1>DEADLOCK <span style="color:var(--site-primary)">TRACKER</span></h1><p class="sub">PLAYER PERFORMANCE CENTER</p></div></div>
  <div class="header-actions"><div class="status" id="connectionStatus">API not connected</div><input id="playerId" value="1164063101" placeholder="Steam ID / account ID" aria-label="Steam account ID"><button class="primary" id="loadBtn">Load profile</button></div>
@@ -24,11 +25,13 @@
 <!-- NOTICE: messages here explain connection status, missing data, or errors to the visitor. -->
 <div class="notice" id="notice"><b>Live API connection:</b> This dashboard connects directly to the public Deadlock API at deadlock-api.com. Your Steam profile ID has been converted to SteamID3/account ID and pre-filled. If your profile is private or the API does not expose a requested statistic, the page will show an error or unavailable field rather than inventing data.</div>
 <!-- PROFILE: shows the selected player identity and rank information. -->
+<!-- PROFILE PANEL: this section is a group of related player details. The id values let JavaScript find and update the text later. -->
 <section class="profile">
  <div class="player"><div class="avatar">D</div><div><h2 id="playerName">Deadlock Player</h2><p class="sub" id="playerSub">Steam profile · waiting for account ID</p><p style="margin-top:8px;font-size:11px;color:#aab5ca">Competitive queue · Season overview</p></div></div>
  <div class="rank"><small>Current rank</small><strong id="rankName">—</strong><span id="rankNote">Waiting for API data</span></div>
 </section>
 <!-- SUMMARY CARDS: each card displays one important statistic such as win rate or average K/D/A. -->
+<!-- STATISTIC CARDS: each card has a label, a value, and sometimes a short explanation. JavaScript fills the value placeholders after data loads. -->
 <section class="grid">
  <div class="card"><div class="metric-top">WIN RATE <span class="metric-icon">%</span></div><div class="metric-value" id="winrate">—</div><div class="metric-foot" id="winrateNote">Calculated from fetched matches</div></div>
  <div class="card"><div class="metric-top">MATCHES PLAYED <span class="metric-icon">▤</span></div><div class="metric-value" id="matches">—</div><div class="metric-foot">Fetched match history</div></div>
@@ -37,9 +40,11 @@
 </section>
 <!-- MAIN DASHBOARD PANELS: charts and hero statistics are arranged side by side on wide screens. -->
 <!-- SECONDARY PANELS: rank progression and recent match outcomes. -->
+<!-- PERFORMANCE AND HERO PANELS: the SVG element is an empty drawing area; JavaScript draws the graph inside it. -->
 <section class="main-grid">
  <div class="card">
   <div class="card-head"><div><h3>Performance history</h3><p>Recent match win/loss trend</p></div><div class="pills"><button class="active" data-period="30">30</button><button data-period="90">90</button><button data-period="all">ALL</button></div></div>
+  <!-- The graph uses SVG (Scalable Vector Graphics), a browser format for drawing crisp lines and shapes. -->
   <div class="chart"><svg id="performanceChart" viewBox="0 0 600 220" preserveAspectRatio="none" aria-label="Win rate graph"></svg></div>
   <div class="legend"><span>Win rate</span><span class="blue">Match trend</span></div>
  </div>
@@ -61,6 +66,7 @@
 </div>
 </section>
 <!-- MATCH HISTORY: a table listing individual matches and the stats returned for each one. -->
+<!-- MATCH TABLE: the table headings describe each column. The empty tbody is a placeholder that JavaScript fills with match rows. -->
 <section class="card">
  <div class="card-head"><div><h3>Match history</h3><p>Latest competitive games</p></div><button id="showAll">Show all matches ↓</button></div>
  <div style="overflow-x:auto"><table><thead><tr><th>Result</th><th>Hero</th><th>K / D / A</th><th>Last hits</th><th>Net worth</th><th>Hero level</th><th>Duration</th><th>Mode</th><th>Time</th></tr></thead><tbody id="matchesTable"></tbody></table></div>
@@ -69,6 +75,7 @@
 <div class="footer"><span>DEADLOCK TRACKER · Personal stats dashboard</span><span>Data source: Deadlock API · deadlock-api.com</span></div>
 </div>
 <!-- JavaScript adds behavior: it loads match data, calculates statistics, and updates the page. -->
+<!-- The script element loads the separate JavaScript file. The browser runs it to fetch data and make buttons interactive. -->
 <script src="script.js"></script>
 </body>
 </html>
