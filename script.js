@@ -1,3 +1,5 @@
+// JavaScript makes the dashboard interactive. It fetches match data, calculates statistics, and updates HTML elements.
+// SAMPLE DATA: example values used before a real profile is loaded, so the dashboard does not start completely empty.
 const sample={
  heroes:[
   {name:"Dynamo",icon:"✺",games:42,win:64,kda:"7.8 / 4.2 / 12.4"},
@@ -21,19 +23,37 @@ const sample={
  winrate:[48,52,46,55,51,59,57,62,54,58,64,60,55,67,61,58,63,56,60,66,58,62,57,64,60,68,59,63,61,58],
  rank:[22,24,23,28,30,29,34,33,37,39,38,43,45,44,48,51,50,54,57,56,61,63,62,67,70,68,73,76,78,82]
 };
+// PAGE STATE: variables that remember the selected chart period, table settings, and data loaded from the API.
+// An API (Application Programming Interface) is a service that lets this page request information from another system.
 let period=30,allMatches=false,sortWin=true,liveMatches=[],liveHeroes=[],rankHistory=[];
+// The API base address is kept in one place so it is easy to update if the service changes.
 const API="https://api.deadlock-api.com/v1";
+// HELPER FUNCTIONS: small reusable pieces of code used by several parts of the dashboard.
+// The $ shortcut finds an HTML element by its unique id.
 const $=id=>document.getElementById(id);
+// STATUS MESSAGE: changes the small connection label at the top of the page.
 function setStatus(message,ok=false){$('connectionStatus').textContent=message;$('connectionStatus').style.color=ok?'var(--green)':'var(--muted)';}
+// DURATION FORMATTER: changes a match length in seconds into minutes:seconds.
 function fmtDuration(seconds){if(!Number.isFinite(seconds))return '—';return `${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;}
+// NUMBER CONVERTER: safely turns a value into a number; invalid or missing values become zero.
 function num(v){const n=Number(v);return Number.isFinite(n)?n:0;}
+// FIELD LOOKUP: checks several possible property names and returns the first one that has a value.
 function first(obj,keys){for(const k of keys)if(obj?.[k]!=null)return obj[k];return null;}
+// MATCH NORMALIZATION: API responses can use different field names. This converts each match into one consistent format.
+// A boolean is a value that is either true or false; null here means the result could not be identified safely.
 function normalizeMatch(m){const kills=num(first(m,['player_kills','kills']));const deaths=num(first(m,['player_deaths','deaths']));const assists=num(first(m,['player_assists','assists']));
  const won=first(m,['won','win','is_win']);const team=first(m,['player_team','team']);const winningTeam=first(m,['winning_team','winner_team']);
- let result=typeof won==='boolean'?won:(winningTeam!=null&&team!=null?String(winningTeam)===String(team):null);
+ const outcome=first(m,['player_match_outcome','match_result']);
+ // The Deadlock match-history outcome fields use 1 for a win and 2 for a loss. Other values are left unknown.
+ // Team comparison is used only when the response explicitly includes both the player's team and the winning team.
+ let result=typeof won==='boolean'?won:(winningTeam!=null&&team!=null?String(winningTeam)===String(team):(Number(outcome)===1?true:Number(outcome)===2?false:null));
  return {id:first(m,['match_id','matchId','id']),hero:`Hero ID ${m.hero_id ?? 'Unknown'}`,kills,deaths,assists,lastHits:num(m.last_hits),netWorth:num(m.net_worth),heroLevel:num(m.hero_level),duration:fmtDuration(num(first(m,['match_duration_s','duration_s','duration']))),time:first(m,['start_time','start_time_s','timestamp'])??null,result};}
+// DATE FORMATTING: turns the API timestamp (the numeric date/time value) into a readable date.
+// DATE FORMATTER: converts a Unix timestamp (seconds or milliseconds since Jan. 1, 1970) into a readable date.
 function matchDate(v){if(v==null)return '—';let d=typeof v==='number'?new Date(v<1e12?v*1000:v):new Date(v);return Number.isNaN(d.getTime())?'—':d.toLocaleDateString();}
+// API REQUEST: fetch() asks the Deadlock service for data. async/await lets the page wait for the reply before continuing.
 async function getJson(url){const res=await fetch(url,{headers:{Accept:'application/json'}});if(!res.ok)throw new Error(`API returned HTTP ${res.status} for ${new URL(url).pathname}`);return res.json();}
+// LOAD PROFILE: validates the entered account ID, requests match history, calculates the summary cards, and handles errors.
 async function loadProfile(){const raw=$('playerId').value.trim();if(!raw){$('notice').innerHTML='<b>Enter your SteamID3/account ID.</b> You can find it in your Steam profile URL or use a Steam ID converter.';return;}
  const id=raw.replace(/^\s+|\s+$/g,'');if(!/^\d+$/.test(id)){ $('notice').textContent='Please enter a numeric Steam account ID (SteamID3/account ID), not a display name or vanity URL.';return;}
  setStatus('Connecting…');$('loadBtn').disabled=true;$('notice').textContent='Fetching public match history and player summary…';
@@ -48,46 +68,61 @@ async function loadProfile(){const raw=$('playerId').value.trim();if(!raw){$('no
   $('winrate').textContent=known.length?`${(wins/known.length*100).toFixed(1)}%`:'N/A';$('matches').textContent=liveMatches.length;
   const totalK=liveMatches.reduce((s,m)=>s+m.kills,0),totalD=liveMatches.reduce((s,m)=>s+m.deaths,0),totalA=liveMatches.reduce((s,m)=>s+m.assists,0),count=liveMatches.length||1;
   $('kda').textContent=`${(totalK/count).toFixed(1)} / ${(totalD/count).toFixed(1)} / ${(totalA/count).toFixed(1)}`;
+  // Count consecutive wins starting with the newest match. If the newest result is unknown, a current streak cannot be confirmed.
   let streak=0;for(const m of liveMatches){if(m.result===true)streak++;else break;}
-  $('streak').textContent=streak?`${streak} W`:'—';$('winrateNote').textContent=`${wins} wins · ${losses} losses · ${known.length} matches with result data`;
+  $('streak').textContent=liveMatches.length&&liveMatches[0].result!==null?`${streak} W`:'—';$('winrateNote').textContent=`${wins} wins · ${losses} losses · ${known.length} matches with result data`;
   const rank=null;$('rankName').textContent='Not available';$('rankNote').textContent='Rank is not returned by match history';
   renderLive();setStatus('API connected',true);$('notice').innerHTML=`<b>Connected:</b> Live match history loaded for ${name}. Stats reflect the most recent ${liveMatches.length} matches returned by the API. Some fields may be unavailable depending on API response/privacy settings.`;
   // Rank history is unavailable from the match-history response.
  }catch(err){setStatus('Connection failed');$('notice').innerHTML=`<b>Could not load live stats:</b> ${String(err.message||err)}. Verify the numeric Steam account ID and check that your Deadlock profile is public. The API may also change endpoint schemas or limit requests.`;console.error(err);}
  finally{$('loadBtn').disabled=false;}}
+// LIVE RENDERING: redraws the match table, recent-form dots, hero summaries, and performance graph from loaded matches.
 function renderLive(){
  const known=liveMatches.filter(m=>m.result!==null);const wins=known.filter(m=>m.result).length;const recent=known.slice(0,10);$('recentRecord').textContent=`${recent.filter(m=>m.result).length}W · ${recent.filter(m=>!m.result).length}L`;
  $('formDots').innerHTML=liveMatches.slice(0,10).map((m,i)=>`<button title="Match ${i+1}: ${m.result===null?'Result unavailable':m.result?'Victory':'Defeat'}" style="width:34px;height:34px;padding:0;background:${m.result===true?'#123b32':m.result===false?'#401e2a':'#252d3b'};color:${m.result===true?'#50e3a4':m.result===false?'#ff6b83':'#9aa8c3'};font-weight:800">${m.result===true?'W':m.result===false?'L':'?'}</button>`).join('');
  $('matchesTable').innerHTML=(allMatches?liveMatches:liveMatches.slice(0,5)).map(m=>`<tr><td class="result ${m.result===true?'win':m.result===false?'loss':''}">${m.result===true?'VICTORY':m.result===false?'DEFEAT':'UNKNOWN'}</td><td><div class="hero-cell">${m.hero}</div></td><td class="kda">${m.kills} / ${m.deaths} / ${m.assists}</td><td>${m.lastHits.toLocaleString()}</td><td>${m.netWorth.toLocaleString()}</td><td>${m.heroLevel || '—'}</td><td>${m.duration}</td><td>Match</td><td>${matchDate(m.time)}</td></tr>`).join('');
  const byHero={};for(const m of liveMatches){const h=String(m.hero);if(!byHero[h])byHero[h]={name:h,icon:'✦',games:0,wins:0,k:0,d:0,a:0};const x=byHero[h];x.games++;if(m.result===true)x.wins++;x.k+=m.kills;x.d+=m.deaths;x.a+=m.assists;}
  liveHeroes=Object.values(byHero).map(h=>({...h,win:h.games?h.wins/h.games*100:0,kda:`${(h.k/h.games).toFixed(1)} / ${(h.d/h.games).toFixed(1)} / ${(h.a/h.games).toFixed(1)}`}));renderHeroes();
- const winSeries=liveMatches.slice(0,period).reverse().map((m,i,arr)=>{const from=Math.max(0,i-4),chunk=arr.slice(from,i+1).filter(x=>x.result!==null);return chunk.length?chunk.filter(x=>x.result).length/chunk.length*100:0;});
- svgLine('performanceChart',winSeries.length>1?winSeries:[0,0],'#a78bfa');
+ // Build a cumulative win-rate line from oldest to newest. Unknown outcomes are skipped, not treated as losses.
+ const chronological=liveMatches.slice(0,period).reverse().filter(m=>m.result!==null);
+ let runningWins=0;const winSeries=chronological.map((m,i)=>{if(m.result)runningWins++;return runningWins/(i+1)*100;});
+ if(winSeries.length>0){svgLine('performanceChart',winSeries,'#a78bfa');}
+ else{$('performanceChart').innerHTML='<text x="300" y="110" text-anchor="middle" fill="currentColor" opacity=".6" font-size="13">Match outcomes are not available yet</text>';}
  const saved=(()=>{try{return JSON.parse(localStorage.getItem('deadlock-rank-history')||'[]')}catch(e){return []}})();rankHistory=saved;
  if(rankHistory.length>1){svgLine('rankChart',rankHistory.map(x=>x.rank),'#6da8ff');$('rankDelta').textContent='Saved snapshots';}else{$('rankChart').innerHTML='<text x="300" y="80" text-anchor="middle" fill="currentColor" opacity=".6" font-size="13">Rank history accumulates after repeated visits</text>';}
 }
+// SVG GRAPH DRAWING: creates the chart lines and grid using SVG (a format for drawing shapes in a webpage).
 function svgLine(id,values,color,fill=true){
  const svg=document.getElementById(id),w=600,h=id==="rankChart"?160:220,p=24;
- const min=Math.min(...values)-5,max=Math.max(...values)+5;
+ // A single data point is duplicated so the chart has two horizontal coordinates to draw between.
+ if(values.length===1){values=[values[0],values[0]];}
+ // Add a little space above and below the data. A fallback range prevents division by zero when every value is equal.
+ let min=Math.min(...values)-5,max=Math.max(...values)+5;if(max===min){max=min+10;}
  const pts=values.map((v,i)=>`${p+i*(w-2*p)/(values.length-1)},${h-p-(v-min)/(max-min)*(h-2*p)}`).join(" ");
  let grid="";
  for(let i=0;i<4;i++){let y=p+i*(h-2*p)/3;grid+=`<line x1="${p}" y1="${y}" x2="${w-p}" y2="${y}" stroke="currentColor" opacity=".09"/>`}
  svg.innerHTML=grid+(fill?`<polygon points="${p},${h-p} ${pts} ${w-p},${h-p}" fill="${color}" opacity=".10"/>`:"")+`<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`+values.map((v,i)=>{if(i%Math.ceil(values.length/8))return "";let x=p+i*(w-2*p)/(values.length-1),y=h-p-(v-min)/(max-min)*(h-2*p);return `<circle cx="${x}" cy="${y}" r="3.5" fill="${color}"/>`}).join("");
 }
+// HERO STATISTICS: groups matches by hero and displays each hero's games, average K/D/A, and win rate.
 function renderHeroes(){
  let heroes=[...(liveHeroes.length?liveHeroes:sample.heroes)].sort((a,b)=>sortWin?b.win-a.win:b.games-a.games);
  document.getElementById("heroList").innerHTML=heroes.map(h=>`<div><div class="hero-row"><div class="hero-avatar">${h.icon}</div><div><div class="hero-name">${h.name}</div><div class="hero-meta">${h.games} matches · ${h.kda} K/D/A</div></div><div class="hero-stat">${h.win}%<small>win rate</small></div></div><div class="bar"><i style="width:${h.win}%"></i></div></div>`).join("");
 }
+// MATCH TABLE FALLBACK: displays sample matches until live match history has been loaded.
 function renderMatches(){
  if(liveMatches.length){renderLive();return;}
  let data=allMatches?sample.matches:sample.matches.slice(0,5);
  document.getElementById("matchesTable").innerHTML=data.map(m=>`<tr><td class="result ${m[0]==="W"?"win":"loss"}">${m[0]==="W"?"VICTORY":"DEFEAT"}</td><td><div class="hero-cell"><span class="hero-avatar" style="width:25px;height:25px;font-size:11px">${(sample.heroes.find(h=>h.name===m[1])||{icon:"✦"}).icon}</span>${m[1]}</div></td><td class="kda">${m[2]}</td><td>${m[3]}</td><td>${m[4]}</td><td>${m[5]}</td></tr>`).join("");
 }
+// SAMPLE RECENT FORM: fills the recent-form panel with example outcomes before live data is loaded.
 function renderForm(){
  const outcomes=["W","W","L","W","W","L","W","W","L","W"];
  document.getElementById("formDots").innerHTML=outcomes.map((o,i)=>`<button title="Match ${10-i}: ${o==="W"?"Victory":"Defeat"}" style="width:34px;height:34px;padding:0;background:${o==="W"?"#123b32":"#401e2a"};border-color:${o==="W"?"#23664f":"#733044"};color:${o==="W"?"#50e3a4":"#ff6b83"};font-weight:800">${o}</button>`).join("");
 }
+// INITIAL PAGE RENDER: draws the sample charts and lists when the page first opens.
 function render(){let vals=sample.winrate.slice(-period);svgLine("performanceChart",vals,"#a78bfa");svgLine("rankChart",sample.rank,"#6da8ff");renderHeroes();renderMatches();renderForm();}
+// BUTTON EVENTS: connect clicks and Enter-key presses to the functions that update the page.
+// An event listener is code that runs in response to an action such as a click or key press.
 document.querySelectorAll("[data-period]").forEach(b=>b.addEventListener("click",()=>{period=b.dataset.period==="all"?100:Number(b.dataset.period);document.querySelectorAll("[data-period]").forEach(x=>x.classList.toggle("active",x===b));liveMatches.length?renderLive():render()}));
 document.getElementById("heroSort").onclick=()=>{sortWin=!sortWin;document.getElementById("heroSort").textContent=sortWin?"Sort: Win rate":"Sort: Matches";renderHeroes()};
 document.getElementById("showAll").onclick=()=>{allMatches=!allMatches;document.getElementById("showAll").textContent=allMatches?"Show fewer matches ↑":"Show all matches ↓";renderMatches()};

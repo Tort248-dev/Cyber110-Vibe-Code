@@ -1,28 +1,42 @@
+<!-- HTML (HyperText Markup Language) gives the dashboard its page structure. This declaration tells the browser to use modern HTML rules. -->
 <!doctype html>
+<!-- The html element contains the entire page. The lang attribute identifies the page language for browsers and accessibility tools. -->
 <html lang="en">
+<!-- HEAD: page information and links to files the browser needs; it is not displayed as dashboard content. -->
 <head>
+<!-- Character encoding tells the browser how to display letters and symbols. UTF-8 supports a wide range of characters. -->
 <meta charset="utf-8">
+<!-- The viewport setting helps the layout fit phone, tablet, and desktop screens. -->
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Deadlock — Player Performance</title>
+<!-- A stylesheet is a file containing visual rules. This connects the page to its separate CSS file. -->
 <link rel="stylesheet" href="style.css">
 </head>
+<!-- BODY: everything inside this element is visible page content. -->
 <body>
+<!-- The app wrapper groups the dashboard and provides its overall page spacing. -->
 <div class="app">
+<!-- HEADER: the title, connection status, account ID field, and button for loading live data. -->
 <header>
  <div class="brand"><div class="logo">D</div><div><h1>DEADLOCK <span style="color:var(--site-primary)">TRACKER</span></h1><p class="sub">PLAYER PERFORMANCE CENTER</p></div></div>
  <div class="header-actions"><div class="status" id="connectionStatus">API not connected</div><input id="playerId" value="1164063101" placeholder="Steam ID / account ID" aria-label="Steam account ID"><button class="primary" id="loadBtn">Load profile</button></div>
 </header>
+<!-- NOTICE: messages here explain connection status, missing data, or errors to the visitor. -->
 <div class="notice" id="notice"><b>Live API connection:</b> This dashboard connects directly to the public Deadlock API at deadlock-api.com. Your Steam profile ID has been converted to SteamID3/account ID and pre-filled. If your profile is private or the API does not expose a requested statistic, the page will show an error or unavailable field rather than inventing data.</div>
+<!-- PROFILE: shows the selected player identity and rank information. -->
 <section class="profile">
  <div class="player"><div class="avatar">D</div><div><h2 id="playerName">Deadlock Player</h2><p class="sub" id="playerSub">Steam profile · waiting for account ID</p><p style="margin-top:8px;font-size:11px;color:#aab5ca">Competitive queue · Season overview</p></div></div>
  <div class="rank"><small>Current rank</small><strong id="rankName">—</strong><span id="rankNote">Waiting for API data</span></div>
 </section>
+<!-- SUMMARY CARDS: each card displays one important statistic such as win rate or average K/D/A. -->
 <section class="grid">
  <div class="card"><div class="metric-top">WIN RATE <span class="metric-icon">%</span></div><div class="metric-value" id="winrate">—</div><div class="metric-foot" id="winrateNote">Calculated from fetched matches</div></div>
  <div class="card"><div class="metric-top">MATCHES PLAYED <span class="metric-icon">▤</span></div><div class="metric-value" id="matches">—</div><div class="metric-foot">Fetched match history</div></div>
  <div class="card"><div class="metric-top">K / D / A <span class="metric-icon">✦</span></div><div class="metric-value" id="kda">—</div><div class="metric-foot">Average per match</div></div>
  <div class="card"><div class="metric-top">WIN STREAK <span class="metric-icon">↗</span></div><div class="metric-value" id="streak">—</div><div class="metric-foot">From fetched match history</div></div>
 </section>
+<!-- MAIN DASHBOARD PANELS: charts and hero statistics are arranged side by side on wide screens. -->
+<!-- SECONDARY PANELS: rank progression and recent match outcomes. -->
 <section class="main-grid">
  <div class="card">
   <div class="card-head"><div><h3>Performance history</h3><p>Recent match win/loss trend</p></div><div class="pills"><button class="active" data-period="30">30</button><button data-period="90">90</button><button data-period="all">ALL</button></div></div>
@@ -46,12 +60,15 @@
   <p style="font-size:12px;color:var(--muted);line-height:1.7">Your recent match outcomes at a glance. Hover or tap a match for its result.</p>
 </div>
 </section>
+<!-- MATCH HISTORY: a table listing individual matches and the stats returned for each one. -->
 <section class="card">
  <div class="card-head"><div><h3>Match history</h3><p>Latest competitive games</p></div><button id="showAll">Show all matches ↓</button></div>
  <div style="overflow-x:auto"><table><thead><tr><th>Result</th><th>Hero</th><th>K / D / A</th><th>Last hits</th><th>Net worth</th><th>Hero level</th><th>Duration</th><th>Mode</th><th>Time</th></tr></thead><tbody id="matchesTable"></tbody></table></div>
 </section>
+<!-- FOOTER: small attribution and project information at the bottom of the page. -->
 <div class="footer"><span>DEADLOCK TRACKER · Personal stats dashboard</span><span>Data source: Deadlock API · deadlock-api.com</span></div>
 </div>
+<!-- JavaScript adds behavior: it loads match data, calculates statistics, and updates the page. -->
 <script src="script.js"></script>
 </body>
 </html>
