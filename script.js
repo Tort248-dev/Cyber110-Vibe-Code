@@ -35,6 +35,15 @@ const API="https://api.deadlock-api.com/v1";
 // The $ shortcut finds an HTML element by its unique id.
 // This short helper avoids repeating document.getElementById. The document represents the webpage, and an element is one piece of its HTML.
 const $=id=>document.getElementById(id);
+// LOCAL STORAGE: a small area of browser storage that remembers text even after the page is closed.
+// This key is the label used to find the saved account number later. Keep the same key when reading and writing.
+const PLAYER_ID_STORAGE_KEY='deadlock-player-id';
+// When the page opens, getItem() reads the last account number saved by this website.
+// The try/catch prevents a browser storage restriction from stopping the rest of the dashboard from working.
+try{
+ const savedPlayerId=localStorage.getItem(PLAYER_ID_STORAGE_KEY);
+ if(savedPlayerId)$('playerId').value=savedPlayerId;
+}catch(error){console.warn('Browser storage is unavailable; the account ID will not be remembered.',error);}
 // STATUS MESSAGE: changes the small connection label at the top of the page.
 // A function is a reusable set of instructions. This one updates the connection message and uses a different color when the connection succeeds.
 function setStatus(message,ok=false){$('connectionStatus').textContent=message;$('connectionStatus').style.color=ok?'var(--green)':'var(--muted)';}
@@ -70,6 +79,9 @@ async function getJson(url){const res=await fetch(url,{headers:{Accept:'applicat
 // async marks a function that can wait for slow tasks; await pauses this function until a request has finished.
 async function loadProfile(){const raw=$('playerId').value.trim();if(!raw){$('notice').innerHTML='<b>Enter your SteamID3/account ID.</b> You can find it in your Steam profile URL or use a Steam ID converter.';return;}
  const id=raw.replace(/^\s+|\s+$/g,'');if(!/^\d+$/.test(id)){ $('notice').textContent='Please enter a numeric Steam account ID (SteamID3/account ID), not a display name or vanity URL.';return;}
+ // setItem() saves the valid account number in this browser. It is saved before the API request,
+ // so the number is remembered even if the API is temporarily unavailable.
+ try{localStorage.setItem(PLAYER_ID_STORAGE_KEY,id);}catch(error){console.warn('Could not save the account ID in browser storage.',error);}
  setStatus('Connecting…');$('loadBtn').disabled=true;$('notice').textContent='Fetching public match history and player summary…';
  try{
   // encodeURIComponent safely prepares the account ID for use inside a web address. The limit asks the API for up to 100 recent matches.
