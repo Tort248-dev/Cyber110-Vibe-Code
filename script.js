@@ -28,10 +28,10 @@ function setStatus(message,ok=false){$('connectionStatus').textContent=message;$
 function fmtDuration(seconds){if(!Number.isFinite(seconds))return '—';return `${Math.floor(seconds/60)}:${String(Math.floor(seconds%60)).padStart(2,'0')}`;}
 function num(v){const n=Number(v);return Number.isFinite(n)?n:0;}
 function first(obj,keys){for(const k of keys)if(obj?.[k]!=null)return obj[k];return null;}
-function normalizeMatch(m){const stats=m.player_stats||m.stats||m;const kills=num(first(stats,['kills','kill'])),deaths=num(first(stats,['deaths','death'])),assists=num(first(stats,['assists','assist']));
+function normalizeMatch(m){const kills=num(first(m,['player_kills','kills']));const deaths=num(first(m,['player_deaths','deaths']));const assists=num(first(m,['player_assists','assists']));
  const won=first(m,['won','win','is_win']);const team=first(m,['player_team','team']);const winningTeam=first(m,['winning_team','winner_team']);
  let result=typeof won==='boolean'?won:(winningTeam!=null&&team!=null?String(winningTeam)===String(team):null);
- return {id:first(m,['match_id','matchId','id']),hero:first(m,['hero_name','hero','hero_id'])??'Unknown hero',kills,deaths,assists,duration:fmtDuration(num(first(m,['match_duration_s','duration_s','duration']))),time:first(m,['start_time','start_time_s','timestamp'])??null,result};}
+ return {id:first(m,['match_id','matchId','id']),hero:`Hero ID ${m.hero_id ?? 'Unknown'}`,kills,deaths,assists,lastHits:num(m.last_hits),netWorth:num(m.net_worth),heroLevel:num(m.hero_level),duration:fmtDuration(num(first(m,['match_duration_s','duration_s','duration']))),time:first(m,['start_time','start_time_s','timestamp'])??null,result};}
 function matchDate(v){if(v==null)return '—';let d=typeof v==='number'?new Date(v<1e12?v*1000:v):new Date(v);return Number.isNaN(d.getTime())?'—':d.toLocaleDateString();}
 async function getJson(url){const res=await fetch(url,{headers:{Accept:'application/json'}});if(!res.ok)throw new Error(`API returned HTTP ${res.status} for ${new URL(url).pathname}`);return res.json();}
 async function loadProfile(){const raw=$('playerId').value.trim();if(!raw){$('notice').innerHTML='<b>Enter your SteamID3/account ID.</b> You can find it in your Steam profile URL or use a Steam ID converter.';return;}
@@ -39,7 +39,7 @@ async function loadProfile(){const raw=$('playerId').value.trim();if(!raw){$('no
  setStatus('Connecting…');$('loadBtn').disabled=true;$('notice').textContent='Fetching public match history and player summary…';
  try{
   const history=await getJson(`${API}/players/${encodeURIComponent(id)}/match-history?limit=100`);
-  const matches=Array.isArray(history)?history:(history.matches||history.data||[]);
+  const matches=Array.isArray(history)?history:Array.isArray(history.matches)?history.matches:Array.isArray(history.data)?history.data:Object.values(history);
   if(!Array.isArray(matches)||!matches.length)throw new Error('No public match history was returned. Check the ID and whether your stats are public.');
   liveMatches=matches.map(normalizeMatch);liveMatches.sort((a,b)=>num(b.time)-num(a.time));
   const name=`Steam ${id}`;
@@ -58,7 +58,7 @@ async function loadProfile(){const raw=$('playerId').value.trim();if(!raw){$('no
 function renderLive(){
  const known=liveMatches.filter(m=>m.result!==null);const wins=known.filter(m=>m.result).length;const recent=known.slice(0,10);$('recentRecord').textContent=`${recent.filter(m=>m.result).length}W · ${recent.filter(m=>!m.result).length}L`;
  $('formDots').innerHTML=liveMatches.slice(0,10).map((m,i)=>`<button title="Match ${i+1}: ${m.result===null?'Result unavailable':m.result?'Victory':'Defeat'}" style="width:34px;height:34px;padding:0;background:${m.result===true?'#123b32':m.result===false?'#401e2a':'#252d3b'};color:${m.result===true?'#50e3a4':m.result===false?'#ff6b83':'#9aa8c3'};font-weight:800">${m.result===true?'W':m.result===false?'L':'?'}</button>`).join('');
- $('matchesTable').innerHTML=(allMatches?liveMatches:liveMatches.slice(0,5)).map(m=>`<tr><td class="result ${m.result===true?'win':m.result===false?'loss':''}">${m.result===true?'VICTORY':m.result===false?'DEFEAT':'UNKNOWN'}</td><td><div class="hero-cell">${m.hero}</div></td><td class="kda">${m.kills} / ${m.deaths} / ${m.assists}</td><td>${m.duration}</td><td>Match</td><td>${matchDate(m.time)}</td></tr>`).join('');
+ $('matchesTable').innerHTML=(allMatches?liveMatches:liveMatches.slice(0,5)).map(m=>`<tr><td class="result ${m.result===true?'win':m.result===false?'loss':''}">${m.result===true?'VICTORY':m.result===false?'DEFEAT':'UNKNOWN'}</td><td><div class="hero-cell">${m.hero}</div></td><td class="kda">${m.kills} / ${m.deaths} / ${m.assists}</td><td>${m.lastHits.toLocaleString()}</td><td>${m.netWorth.toLocaleString()}</td><td>${m.heroLevel || '—'}</td><td>${m.duration}</td><td>Match</td><td>${matchDate(m.time)}</td></tr>`).join('');
  const byHero={};for(const m of liveMatches){const h=String(m.hero);if(!byHero[h])byHero[h]={name:h,icon:'✦',games:0,wins:0,k:0,d:0,a:0};const x=byHero[h];x.games++;if(m.result===true)x.wins++;x.k+=m.kills;x.d+=m.deaths;x.a+=m.assists;}
  liveHeroes=Object.values(byHero).map(h=>({...h,win:h.games?h.wins/h.games*100:0,kda:`${(h.k/h.games).toFixed(1)} / ${(h.d/h.games).toFixed(1)} / ${(h.a/h.games).toFixed(1)}`}));renderHeroes();
  const winSeries=liveMatches.slice(0,period).reverse().map((m,i,arr)=>{const from=Math.max(0,i-4),chunk=arr.slice(from,i+1).filter(x=>x.result!==null);return chunk.length?chunk.filter(x=>x.result).length/chunk.length*100:0;});
